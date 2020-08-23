@@ -1,4 +1,4 @@
-# yt2sp - YouTube 2 Spotify
+# yt2sp - YouTube To Spotify
 
 This tool synchronizes your YouTube playlists to Spotify playlists,
 intelligently searching for artist & title based on the YouTube video's
