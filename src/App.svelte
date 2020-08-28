@@ -304,6 +304,9 @@
   {#if !syncTable.length}
     <h1>YouTube To Spotify</h1>
     <p>
+      <a href="https://github.com/yt2sp/yt2sp">Github page</a>
+    </p>
+    <p>
       This tool synchronizes your YouTube playlists to Spotify playlists,
       intelligently searching for artist & title based on the YouTube video's
       name, skipping duplicates and offering the possibility for manual
