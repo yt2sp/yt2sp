@@ -1,21 +1,15 @@
 <script>
-  import { onMount } from 'svelte'
-  import loader from '@beyonk/async-script-loader'
-
   const REDIRECT = window.location.href.slice(0, -1)
   const SPOTIFY_STATE = 'yt2sp'
   const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly'
   const SPOTIFY_SCOPE =
     'user-read-private user-read-email playlist-read-private playlist-modify-private'
   var popup
-  var GoogleAuth
 
-  var googleUser
   var spotifyUser
   var isGoogleAuthorized
-
+  var youtubePlaylists
   $: spotifyUserId = spotifyUser && spotifyUser.id
-  $: youtubePlaylists = loadYoutubePlaylists(isGoogleAuthorized)
   $: spotifyPlaylists = loadSpotifyPlaylists(spotifyUserId)
   var selectedYoutube
   var selectedSpotify
@@ -81,61 +75,53 @@
     }
     popup = window.open(url, 'Login with Spotify', 'width=800,height=600')
   }
+  let tokenClient
 
-  onMount(() => {
-    loader(
-      [{ type: 'script', url: '//apis.google.com/js/api.js' }],
-      () => window['gapi'],
-      () => gapi.load('client:auth2', initClient)
-    )
-  })
-
-  function initClient() {
-    var discoveryUrl =
-      'https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'
-    gapi.client
-      .init({
-        apiKey: GOOGLE_APIKEY,
-        clientId: GOOGLE_CLIENTID,
-        discoveryDocs: [discoveryUrl],
-        scope: GOOGLE_SCOPE,
-      })
-      .then(function () {
-        GoogleAuth = gapi.auth2.getAuthInstance()
-        GoogleAuth.isSignedIn.listen(setSigninStatus)
-        var googleUser = GoogleAuth.currentUser.get()
-        setSigninStatus()
-      })
+  function gapiInit() {
+    gapi.client.init({}).then(function () {
+      gapi.client.load(
+        'https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'
+      )
+    })
   }
 
-  function handleAuthClick() {
-    if (GoogleAuth.isSignedIn.get()) {
-      GoogleAuth.signOut()
-    } else {
-      GoogleAuth.signIn()
+  function gapiLoad() {
+    gapi.load('client', gapiInit)
+  }
+
+  function gisInit() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENTID,
+      scope: GOOGLE_SCOPE,
+      callback: '',
+    })
+  }
+
+  window.handleCredentialResponse = (response) => {
+    isGoogleAuthorized = true
+    tokenClient.callback = async (resp) => {
+      if (resp.error !== undefined) {
+        throw resp
+      }
+
+      var page
+      youtubePlaylists = []
+      do {
+        var r = await gapi.client.youtube.playlists.list({
+          part: ['id,snippet,contentDetails'],
+          maxResults: 50,
+          mine: true,
+          pageToken: page,
+        })
+        youtubePlaylists = youtubePlaylists.concat(r.result.items)
+        page = r.result.nextPageToken || null
+      } while (page)
     }
-  }
-
-  function setSigninStatus(isSignedIn) {
-    googleUser = GoogleAuth.currentUser.get()
-    isGoogleAuthorized = googleUser.hasGrantedScopes(GOOGLE_SCOPE)
-  }
-
-  async function loadYoutubePlaylists(user) {
-    if (!isGoogleAuthorized) return []
-    var page
-    var youtubePlaylists = []
-    do {
-      var r = await gapi.client.youtube.playlists.list({
-        part: ['id,snippet,contentDetails'],
-        maxResults: 50,
-        mine: true,
-        pageToken: page,
-      })
-      youtubePlaylists = youtubePlaylists.concat(r.result.items)
-      page = r.result.nextPageToken || null
-    } while (page)
-    return youtubePlaylists
+    if (gapi.client.getToken() === null) {
+      tokenClient.requestAccessToken({ prompt: 'consent' })
+    } else {
+      tokenClient.requestAccessToken({ prompt: '' })
+    }
   }
 
   async function loadSpotifyPlaylists(user) {
@@ -299,6 +285,22 @@
   }
 </style>
 
+<svelte:head>
+  <script
+    async
+    defer
+    src="https://apis.google.com/js/api.js"
+    on:load={gapiLoad}>
+
+  </script>
+  <script
+    async
+    defer
+    src="https://accounts.google.com/gsi/client"
+    on:load={gisInit}>
+
+  </script>
+</svelte:head>
 <main>
 
   {#if !syncTable.length}
@@ -328,14 +330,29 @@
 
     <h2>Step 1: Connect accounts:</h2>
 
+    <b>Google:</b>
     <p>
-      <b>Google:</b>
+
       {#if isGoogleAuthorized}
-        Signed in as {googleUser.getBasicProfile().getName()}
+        Signed in - reload to sign in again
+      {:else}
+        <div
+          id="g_id_onload"
+          data-client_id="985321036628-tlp6avu4gnudpr6dpms504lstmoj9uqm.apps.googleusercontent.com"
+          data-context="signin"
+          data-ux_mode="popup"
+          data-callback="handleCredentialResponse"
+          data-auto_prompt="false" />
+
+        <div
+          class="g_id_signin"
+          data-type="standard"
+          data-shape="rectangular"
+          data-theme="outline"
+          data-text="signin_with"
+          data-size="large"
+          data-logo_alignment="left" />
       {/if}
-      <button on:click={handleAuthClick}>
-        {#if isGoogleAuthorized}Sign out{:else}Sign in{/if}
-      </button>
     </p>
 
     <p>
@@ -355,9 +372,7 @@
         </td>
         <td>
 
-          {#await youtubePlaylists}
-            ...
-          {:then youtubePlaylists}
+          {#if youtubePlaylists}
             {#if youtubePlaylists.length}
               <select bind:value={selectedYoutube}>
                 {#each youtubePlaylists as playlist}
@@ -368,7 +383,7 @@
                 {/each}
               </select>
             {:else}...{/if}
-          {/await}
+          {/if}
 
         </td>
       </tr>
