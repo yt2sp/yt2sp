@@ -31,8 +31,11 @@ jobs:
         SPOTIFY_CLIENTID: ${{ secrets.SPOTIFY_CLIENTID }}
 
     - name: Deploy
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./public
-    
+      run: |
+        git config --global user.name $user_name
+        git config --global user.email $user_email
+        npm run deploy
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
