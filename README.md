@@ -1,3 +1,8 @@
+# IMPORTANT NOTICE
+
+This project is now archived as I did not manage to keep up with Google's changes
+in their login mechanism.
+
 # yt2sp - YouTube To Spotify
 
 This tool synchronizes your YouTube playlists to Spotify playlists,
